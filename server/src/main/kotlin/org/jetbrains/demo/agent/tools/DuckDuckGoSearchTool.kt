@@ -5,15 +5,18 @@ import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.agents.core.tools.annotations.Tool
 import ai.koog.agents.core.tools.reflect.ToolSet
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
+import org.slf4j.LoggerFactory
 
 class DuckDuckGoSearchTool(private val client: HttpClient) : ToolSet {
+    private val logger = LoggerFactory.getLogger(DuckDuckGoSearchTool::class.java)
+    private val json = Json { ignoreUnknownKeys = true }
+    
     @Tool
     @LLMDescription("Searches DuckDuckGo for web results based on a query.")
     suspend fun search(
@@ -22,12 +25,14 @@ class DuckDuckGoSearchTool(private val client: HttpClient) : ToolSet {
         @LLMDescription("Maximum number of results to return (default: 5).")
         maxResults: Int = 5
     ): SearchToolResult = try {
-        val response = client.get("https://api.duckduckgo.com/") {
+        val responseText = client.get("https://api.duckduckgo.com/") {
             parameter("q", query)
             parameter("format", "json")
             parameter("no_html", "1")
             parameter("skip_disambig", "1")
-        }.body<DuckDuckGoResponse>()
+        }.bodyAsText()
+        logger.info("DuckDuckGo raw response: $responseText")
+        val response = json.decodeFromString<DuckDuckGoResponse>(responseText)
 
         val results = response.relatedTopics
             .take(maxResults)
@@ -83,26 +88,7 @@ class DuckDuckGoSearchTool(private val client: HttpClient) : ToolSet {
 
     @Serializable
     private data class DuckDuckGoResponse(
-        @SerialName("Abstract") val abstract: String = "",
-        @SerialName("AbstractSource") val abstractSource: String = "",
-        @SerialName("AbstractText") val abstractText: String = "",
-        @SerialName("AbstractURL") val abstractURL: String = "",
-        @SerialName("Answer") val answer: String = "",
-        @SerialName("AnswerType") val answerType: String = "",
-        @SerialName("Definition") val definition: String = "",
-        @SerialName("DefinitionSource") val definitionSource: String = "",
-        @SerialName("DefinitionURL") val definitionURL: String = "",
-        @SerialName("Entity") val entity: String = "",
-        @SerialName("Heading") val heading: String = "",
-        @SerialName("Image") val image: String = "",
-        @SerialName("ImageHeight") val imageHeight: Int = 0,
-        @SerialName("ImageIsLogo") val imageIsLogo: Int = 0,
-        @SerialName("ImageWidth") val imageWidth: Int = 0,
-        @SerialName("Infobox") val infobox: String = "",
-        @SerialName("Redirect") val redirect: String = "",
-        @SerialName("RelatedTopics") val relatedTopics: List<RelatedTopic> = emptyList(),
-        @SerialName("Results") val results: List<String> = emptyList(),
-        @SerialName("Type") val type: String = ""
+        @SerialName("RelatedTopics") val relatedTopics: List<RelatedTopic> = emptyList()
     )
 
     @Serializable

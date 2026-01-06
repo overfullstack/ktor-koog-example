@@ -6,8 +6,18 @@ import ai.koog.agents.core.agent.entity.AIAgentNodeBase
 import ai.koog.agents.core.annotation.InternalAgentsApi
 import ai.koog.agents.core.dsl.builder.*
 import kotlinx.coroutines.*
+import org.slf4j.LoggerFactory
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
+
+private val logger = LoggerFactory.getLogger("ParallelNode")
+
+private fun isOpenTelemetrySpanError(e: Throwable): Boolean =
+    e is IllegalStateException && (
+        e.message?.contains("Span with id") == true ||
+        e.message?.contains("already added") == true ||
+        e.message?.contains("span") == true
+    )
 
 fun <IncomingInput, Wrapped, Value, OutgoingOutput> parallel(
     transform: suspend (Wrapped) -> List<Value>,
@@ -58,18 +68,44 @@ private class AIAgentParallelNodeBuilder<IncomingInput, Wrapped, Value, Outgoing
     execute = { input: IncomingInput ->
         val initialContext: AIAgentContextBase = this
         val nodeContext = initialContext.fork()
-        val nodeOutput = inputNode.execute(nodeContext, input)?.let { transform(it) }.orEmpty()
+        
+        // Execute input node with OTel error protection
+        val inputNodeResult = try {
+            inputNode.execute(nodeContext, input)
+        } catch (e: Exception) {
+            if (isOpenTelemetrySpanError(e)) {
+                logger.debug("OpenTelemetry span error ignored in input node: ${e.message}")
+                null
+            } else {
+                throw e
+            }
+        }
+        val nodeOutput = inputNodeResult?.let { transform(it) }.orEmpty()
 
         val nodeResults = supervisorScope {
-            nodeOutput.map { value ->
+            nodeOutput.mapIndexed { index, value ->
                 async(dispatcher) {
                     val nodeContext = initialContext.fork()
-                    val nodeOutput = node.execute(nodeContext, value)
+                    val nodeOutput = try {
+                        node.execute(nodeContext, value)
+                    } catch (e: Exception) {
+                        if (isOpenTelemetrySpanError(e)) {
+                            // Ignore OpenTelemetry span errors in parallel execution
+                            logger.debug("OpenTelemetry span error ignored in parallel node[$index]: ${e.message}")
+                            null
+                        } else {
+                            throw e
+                        }
+                    }
 
-                    if (nodeOutput == null && nodeContext.getAgentContextData() != null) {
-                        throw IllegalStateException(
-                            "Checkpoints are not supported in parallel execution. Node: ${node.name}, Context: ${nodeContext.getAgentContextData()}"
-                        )
+                    if (nodeOutput == null) {
+                        if (nodeContext.getAgentContextData() != null) {
+                            throw IllegalStateException(
+                                "Checkpoints are not supported in parallel execution. Node: ${node.name}, Context: ${nodeContext.getAgentContextData()}"
+                            )
+                        }
+                        // Skip this result if node returned null (e.g., due to OTel error)
+                        return@async null
                     }
 
                     @Suppress("UNCHECKED_CAST")
@@ -77,7 +113,7 @@ private class AIAgentParallelNodeBuilder<IncomingInput, Wrapped, Value, Outgoing
                         ParallelNodeExecutionResult(nodeOutput as OutgoingOutput, nodeContext)
                     ParallelResult(node.name, input, executionResult)
                 }
-            }.awaitAll()
+            }.awaitAll().filterNotNull()
         }
 
         val mergeContext = AIAgentParallelNodesMergeContext(this, nodeResults)
