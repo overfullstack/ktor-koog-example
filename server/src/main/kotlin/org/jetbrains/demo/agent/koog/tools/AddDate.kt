@@ -17,7 +17,7 @@ fun addDate(
     days: Int,
     @LLMDescription("The number of months to add, defaults to 0")
     months: Int
-): String = LocalDate.parse(date, LocalDate.Formats.ISO)
+): String = LocalDate.parse(date.take(10), LocalDate.Formats.ISO)
     .plus(days, DateTimeUnit.DAY)
     .plus(months, DateTimeUnit.MONTH)
     .format(LocalDate.Formats.ISO)

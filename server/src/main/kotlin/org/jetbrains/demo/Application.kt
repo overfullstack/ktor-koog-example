@@ -54,8 +54,13 @@ suspend fun Application.app(config: AppConfig) {
     val userRepository: UserRepository = ExposedUserRepository(database)
     install(Koog) {
         llm {
-            openAI(config.openAIKey)
-            anthropic(apiKey = config.anthropicKey)
+            openAI(apiKey = System.getenv("LLM_GATEWAY_KEY")) {
+                baseUrl = System.getenv("LLM_GATEWAY_BASE_URL")
+                chatCompletionsPath = "/chat/completions"
+            }
+            anthropic(apiKey = System.getenv("ANTHROPIC_AUTH_TOKEN")) {
+                baseUrl = System.getenv("ANTHROPIC_BEDROCK_BASE_URL")
+            }
         }
     }
 

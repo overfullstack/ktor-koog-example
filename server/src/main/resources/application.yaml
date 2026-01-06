@@ -10,16 +10,16 @@ app:
   openAIKey: "$OPENAI_API_KEY:"
   anthropicKey: "$ANTHROPIC_API_KEY:"
 
-  langfuseUrl: "$LANGFUSE_URL:"
-  langfusePublicKey: "$LANGFUSE_PUBLIC_KEY:"
-  langfuseSecretKey: "$LANGFUSE_SECRET_KEY:"
+  langfuseUrl: "$LANGFUSE_URL:http://localhost:3000"
+  langfusePublicKey: "$LANGFUSE_PUBLIC_KEY:pk-lf-7975f56b-5572-4100-9a04-da53b8743d37"
+  langfuseSecretKey: "$LANGFUSE_SECRET_KEY:sk-lf-4acc102c-4e47-4694-a2e5-2e1ee6a0a4da"
 
   weatherApiUrl: "$WEATHER_API_URL:https://api.open-meteo.com/v1/forecast"
 
   database:
     driverClassName: "$DB_DRIVER_CLASS_NAME:org.postgresql.Driver"
     host: "$DB_HOST:localhost"
-    port: "$DATABASE_PORT:5432"
+    port: "$DATABASE_PORT:5433"
     name: "$DB_NAME:ktor_sample"
     username: "$DB_USERNAME:ktor_user"
     password: "$DB_PASSWORD:ktor_password"

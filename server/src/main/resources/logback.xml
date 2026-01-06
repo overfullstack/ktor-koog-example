@@ -10,4 +10,5 @@
     <logger name="io.netty" level="WARN"/>
     <logger name="com.zaxxer.hikari.pool" level="WARN" />
     <logger name="io.ktor" level="TRACE"/>
+    <logger name="TravelAgent" level="INFO"/>
 </configuration>

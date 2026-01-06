@@ -26,6 +26,7 @@ kotlin {
 dependencies {
     implementation(project(":ktor-openid"))
     implementation(project(":shared"))
+    implementation("io.ktor:ktor-server-websockets:3.3.3")
     implementation(libs.logback)
     implementation(libs.koog.agents)
     implementation(libs.tool.schema)
@@ -44,7 +45,7 @@ dependencies {
     implementation(libs.flyway.postgresql)
     testImplementation(ktorLibs.server.testHost)
     testImplementation(libs.kotlin.test.junit)
-    testImplementation("io.ktor:ktor-server-test-host-jvm:3.2.3")
+    testImplementation("io.ktor:ktor-server-test-host-jvm:3.3.3")
 }
 
 ktor {

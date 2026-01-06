@@ -14,6 +14,7 @@ import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.catch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
@@ -29,11 +30,18 @@ import org.jetbrains.demo.agent.koog.ktor.sseAgent
 import org.jetbrains.demo.agent.koog.ktor.withMaxAgentIterations
 import org.jetbrains.demo.agent.koog.ktor.withSystemPrompt
 import org.jetbrains.demo.agent.tools.tools
+import org.slf4j.LoggerFactory
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.update
 import kotlin.concurrent.atomics.updateAndFetch
 import kotlin.time.Clock
+
+private val logger = LoggerFactory.getLogger("TravelAgent")
+
+private const val ANSI_CYAN = "\u001B[36m"
+private const val ANSI_GREEN = "\u001B[32m"
+private const val ANSI_RESET = "\u001B[0m"
 
 public fun Route.sse(
     path: String,
@@ -70,6 +78,7 @@ fun Application.agent(config: AppConfig) {
                 },
                 installFeatures = {
                     install(OpenTelemetry) {
+                        setVerbose(true)
                         addLangfuseExporter(
                             langfuseUrl = config.langfuseUrl,
                             langfusePublicKey = config.langfusePublicKey,
@@ -78,11 +87,25 @@ fun Application.agent(config: AppConfig) {
                     }
                 }
             ).run(form)
+                .catch { e ->
+                    // Log OpenTelemetry span errors gracefully without crashing
+                    if (e is IllegalStateException && e.message?.contains("Span with id") == true) {
+                        logger.warn("OpenTelemetry span error (non-fatal): ${e.message}")
+                    } else {
+                        logger.error("Agent error: ${e.message}", e)
+                        send(data = Json.encodeToString(AgentEvent.serializer(), AgentError("unknown", "unknown", e.message)))
+                    }
+                }
                 .collect { event: StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan> ->
                     val result = event.toDomainEventOrNull()
 
                     if (result != null) {
-                        send(data = Json.encodeToString(AgentEvent.serializer(), result))
+                        try {
+                            send(data = Json.encodeToString(AgentEvent.serializer(), result))
+                        } catch (e: Exception) {
+                            // Client disconnected - stop sending events
+                            application.environment.log.error(Json.encodeToString(AgentEvent.serializer(), result))
+                        }
                     }
                 }
         }
@@ -128,6 +151,17 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
             }
         )
 
+        is OnBeforeLLMCall -> {
+            logger.info("$ANSI_CYAN=== LLM INPUT (Prompt) ===$ANSI_RESET")
+            logger.info("${ANSI_CYAN}Model: ${model.id}$ANSI_RESET")
+            prompt.messages.forEach { message ->
+                logger.info("${ANSI_CYAN}Role: ${message.role}$ANSI_RESET")
+                logger.info("${ANSI_CYAN}Content: ${message.content}$ANSI_RESET")
+                logger.info("${ANSI_CYAN}---$ANSI_RESET")
+            }
+            null
+        }
+
         is StreamingAIAgent.Event.OnAfterLLMCall -> {
             val input = responses.sumOf { it.metaInfo.inputTokensCount ?: 0 }
             val output = responses.sumOf { it.metaInfo.outputTokensCount ?: 0 }
@@ -136,7 +170,14 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
             inputTokens.update { it + input }
             outputTokens.update { it + output }
             totalTokens.updateAndFetch { it + total }
-            println("Input tokens: ${inputTokens.load()}, output tokens: ${outputTokens.load()}, total tokens: ${totalTokens.load()}")
+
+            logger.info("$ANSI_GREEN=== LLM OUTPUT (Response) ===$ANSI_RESET")
+            responses.filterIsInstance<Message.Assistant>().forEach { message ->
+                logger.info("${ANSI_GREEN}Content: ${message.content}$ANSI_RESET")
+            }
+            logger.info("${ANSI_GREEN}Input tokens: ${inputTokens.load()}, output tokens: ${outputTokens.load()}, total tokens: ${totalTokens.load()}$ANSI_RESET")
+            logger.info("${ANSI_GREEN}========================$ANSI_RESET")
+            
             val responses = responses.filterIsInstance<Message.Assistant>().map { it.content }
             if (responses.isNotEmpty()) AgentEvent.Message(
                 responses.filterIsInstance<Message.Assistant>().map { it.content })
@@ -144,7 +185,6 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
         }
 
         is OnNodeExecutionError,
-        is OnBeforeLLMCall,
         is OnAfterNode,
         is OnBeforeNode,
         is OnStrategyFinished<*, *>,
