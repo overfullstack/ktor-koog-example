@@ -23,6 +23,7 @@ import org.jetbrains.demo.AgentEvent.*
 import org.jetbrains.demo.AgentEvent.Tool
 import org.jetbrains.demo.AppConfig
 import org.jetbrains.demo.JourneyForm
+import org.jetbrains.demo.LLM_MODEL
 import org.jetbrains.demo.agent.chat.strategy.*
 import org.jetbrains.demo.agent.koog.ktor.StreamingAIAgent
 import org.jetbrains.demo.agent.koog.ktor.StreamingAIAgent.Event.*
@@ -58,7 +59,7 @@ fun Application.agent(config: AppConfig) {
             val tools = deferredTools.await()
             sseAgent(
                 planner(tools),
-                AnthropicModels.Sonnet_4,
+                LLM_MODEL,
                 tools.registry() + ToolRegistry {
                     tool(ItineraryIdeasProvider)
                     tool(ResearchedPointOfInterestProvider)

@@ -10,6 +10,7 @@ import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.markdown.markdown
 import org.jetbrains.demo.JourneyForm
+import org.jetbrains.demo.LLM_MODEL
 import org.jetbrains.demo.PointOfInterest
 import org.jetbrains.demo.PointOfInterestFindings
 import org.jetbrains.demo.agent.koog.parallel
@@ -21,7 +22,7 @@ private val WORD_COUNT = 200
 fun planner(tools: Tools) = strategy<JourneyForm, ProposedTravelPlan>("travel-planner") {
     val pointsOfInterest by subgraphWithTask<JourneyForm, ItineraryIdeas>(
         toolSelectionStrategy = tools.mapsAndWeather(),
-        llmModel = AnthropicModels.Sonnet_4,
+        llmModel = LLM_MODEL,
         finishTool = ItineraryIdeasProvider
     ) { input ->
         markdown {
@@ -44,7 +45,7 @@ fun planner(tools: Tools) = strategy<JourneyForm, ProposedTravelPlan>("travel-pl
 
     val researchPointOfInterest by subgraphWithTask<PointOfInterest, ResearchedPointOfInterest>(
         toolSelectionStrategy = tools.mapsAndWeb(),
-        llmModel = AnthropicModels.Sonnet_4,
+        llmModel = LLM_MODEL,
         finishTool = ResearchedPointOfInterestProvider
     ) { idea ->
         val form = agentInput<JourneyForm>()
@@ -67,7 +68,7 @@ fun planner(tools: Tools) = strategy<JourneyForm, ProposedTravelPlan>("travel-pl
     val researchPoints by parallel(compress, researchPointOfInterest) { it.pointsOfInterest }
     val proposePlan by subgraphWithTask<PointOfInterestFindings, ProposedTravelPlan>(
         toolSelectionStrategy = tools.mapsAndWeather(),
-        llmModel =AnthropicModels.Sonnet_4,
+        llmModel = LLM_MODEL,
         finishTool = ProposedTravelPlanProvider
     ) { input ->
         val form = agentInput<JourneyForm>()
