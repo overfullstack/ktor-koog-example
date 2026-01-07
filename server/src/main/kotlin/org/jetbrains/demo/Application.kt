@@ -33,6 +33,7 @@ data class AppConfig(
     val langfusePublicKey: String,
     val langfuseSecretKey: String,
     val weatherApiUrl: String,
+    val tavilyApiKey: String,
     val database: DatabaseConfig,
 )
 

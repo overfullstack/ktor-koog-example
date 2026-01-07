@@ -373,10 +373,7 @@ class StreamingAIAgent<Input, Output>(
     override suspend fun run(agentInput: Input): Flow<Event<Input, Output>> =
         channelFlow<Event<Input, Output>> {
             runningMutex.withLock {
-                if (isRunning) {
-                    throw IllegalStateException("Agent is already running")
-                }
-
+                check(!isRunning) { "Agent is already running" }
                 isRunning = true
             }
             this@StreamingAIAgent.channel = this

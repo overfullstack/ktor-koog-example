@@ -16,12 +16,12 @@ import org.jetbrains.demo.agent.koog.descriptors
 import org.jetbrains.demo.agent.koog.tools.addDate
 
 data class Tools(
-    val duckDuckGoSearchTool: DuckDuckGoSearchTool,
+    val searchTool: TavilySearchTool,
     val weatherTool: WeatherTool,
     val googleMaps: ToolRegistry,
 ) {
     fun registry() = ToolRegistry {
-        tools(duckDuckGoSearchTool)
+        tools(searchTool)
         tools(googleMaps.tools)
         tools(weatherTool)
         tool(::addDate)
@@ -29,7 +29,7 @@ data class Tools(
 
     fun mapsAndWeather() = ToolSelectionStrategy.Tools(
         ToolRegistry {
-            tools(duckDuckGoSearchTool)
+            tools(searchTool)
             tools(googleMaps.tools)
             tools(weatherTool)
             tool(::addDate)
@@ -39,7 +39,7 @@ data class Tools(
     fun mapsAndWeb() = ToolSelectionStrategy.Tools(
         ToolRegistry {
             tools(googleMaps.tools)
-            tools(duckDuckGoSearchTool)
+            tools(searchTool)
             tool(::addDate)
         }.descriptors()
     )
@@ -48,8 +48,8 @@ data class Tools(
 suspend fun Application.tools(config: AppConfig): Tools {
     val googleMaps = McpToolRegistryProvider.fromSseTransport("http://localhost:9011")
     val weather = WeatherTool(httpClient(), config.weatherApiUrl)
-    val duckDuckGoSearchTool = DuckDuckGoSearchTool(httpClient())
-    return Tools(googleMaps = googleMaps, weatherTool = weather, duckDuckGoSearchTool = duckDuckGoSearchTool)
+    val searchTool = TavilySearchTool(httpClient(), config.tavilyApiKey)
+    return Tools(googleMaps = googleMaps, weatherTool = weather, searchTool = searchTool)
 }
 
 private suspend fun McpToolRegistryProvider.fromSseTransport(url: String): ToolRegistry =

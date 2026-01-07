@@ -159,7 +159,7 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
             logger.info("${ANSI_CYAN}Model: ${model.id}$ANSI_RESET")
             prompt.messages.forEach { message ->
                 logger.info("${ANSI_CYAN}Role: ${message.role}$ANSI_RESET")
-                logger.info("${ANSI_CYAN}Content: ${message.content}$ANSI_RESET")
+                logger.info("${ANSI_CYAN}Request Content: ${message.content}$ANSI_RESET")
                 logger.info("${ANSI_CYAN}---$ANSI_RESET")
             }
             null
@@ -175,12 +175,20 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
             totalTokens.updateAndFetch { it + total }
 
             logger.info("$ANSI_GREEN=== LLM OUTPUT (Response) ===$ANSI_RESET")
-            responses.filterIsInstance<Message.Tool.Call>().forEach { toolCall ->
-                logger.info("${ANSI_GREEN}Tool called: ${toolCall.tool} (id: ${toolCall.id})$ANSI_RESET")
-                logger.info("${ANSI_GREEN}Tool args: ${toolCall.content}$ANSI_RESET")
-            }
-            responses.filterIsInstance<Message.Assistant>().forEach { message ->
-                logger.info("${ANSI_GREEN}Content: ${message.content}$ANSI_RESET")
+            logger.info("${ANSI_GREEN}Response types: ${responses.map { it::class.simpleName }}$ANSI_RESET")
+            responses.forEach { response ->
+                when (response) {
+                    is Message.Tool.Call -> {
+                        logger.info("${ANSI_GREEN}Tool called: ${response.tool} (id: ${response.id})$ANSI_RESET")
+                        logger.info("${ANSI_GREEN}Tool args: ${response.content}$ANSI_RESET")
+                    }
+                    is Message.Assistant -> {
+                        logger.info("${ANSI_GREEN}Assistant: ${response.content}$ANSI_RESET")
+                    }
+                    is Message.Reasoning -> {
+                        logger.info("${ANSI_GREEN}Reasoning: ${response.content}$ANSI_RESET")
+                    }
+                }
             }
             logger.info("${ANSI_GREEN}Input tokens: ${inputTokens.load()}, output tokens: ${outputTokens.load()}, total tokens: ${totalTokens.load()}$ANSI_RESET")
             logger.info("${ANSI_GREEN}========================$ANSI_RESET")
