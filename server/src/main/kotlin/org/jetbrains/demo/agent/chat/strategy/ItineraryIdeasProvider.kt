@@ -1,15 +1,10 @@
 package org.jetbrains.demo.agent.chat.strategy
 
-import ai.koog.agents.ext.agent.SubgraphResult
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.jetbrains.demo.PointOfInterest
 
 @Serializable
-data class ItineraryIdeas(val pointsOfInterest: List<PointOfInterest>) : SubgraphResult {
-    override fun toStringDefault(): String =
-        Json.encodeToString(serializer(), this)
-}
+data class ItineraryIdeas(val pointsOfInterest: List<PointOfInterest>)
 
 val ItineraryIdeasProvider = SubgraphResultProvider<ItineraryIdeas>(
     name = "provide_itinerary_ideas",

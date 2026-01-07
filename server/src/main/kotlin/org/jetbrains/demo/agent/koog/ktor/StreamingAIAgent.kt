@@ -1,17 +1,18 @@
 package org.jetbrains.demo.agent.koog.ktor
 
 import ai.koog.agents.core.agent.AIAgent
-import ai.koog.agents.core.agent.AIAgent.FeatureContext
-import ai.koog.agents.core.agent.AIAgentBase
+import ai.koog.agents.core.agent.GraphAIAgent
+import ai.koog.agents.core.agent.GraphAIAgent.FeatureContext
 import ai.koog.agents.core.agent.config.AIAgentConfig
-import ai.koog.agents.core.agent.config.AIAgentConfigBase
-import ai.koog.agents.core.agent.context.AIAgentContextBase
+import ai.koog.agents.core.agent.context.AIAgentContext
+import ai.koog.agents.core.agent.context.AIAgentGraphContextBase
+import ai.koog.agents.core.agent.entity.AIAgentGraphStrategy
 import ai.koog.agents.core.agent.entity.AIAgentNodeBase
-import ai.koog.agents.core.agent.entity.AIAgentStrategy
-import ai.koog.agents.core.tools.ToolArgs
+import ai.koog.agents.core.feature.model.AIAgentError
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.core.tools.ToolResult
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import ai.koog.agents.features.eventHandler.feature.EventHandler
 import ai.koog.ktor.Koog
 import ai.koog.prompt.dsl.ModerationResult
@@ -37,7 +38,7 @@ import kotlin.uuid.Uuid
 suspend fun <Input, Output> ServerSSESession.sseAgent(
     inputType: KType,
     outputType: KType,
-    strategy: AIAgentStrategy<Input, Output>,
+    strategy: AIAgentGraphStrategy<Input, Output>,
     model: LLModel,
     tools: ToolRegistry = ToolRegistry.EMPTY,
     clock: Clock = Clock.System,
@@ -68,7 +69,7 @@ fun AIAgentConfig.withMaxAgentIterations(maxAgentIterations: Int): AIAgentConfig
     AIAgentConfig(prompt, model, maxAgentIterations, missingToolsConversionStrategy)
 
 suspend inline fun <reified Input, reified Output> ServerSSESession.sseAgent(
-    strategy: AIAgentStrategy<Input, Output>,
+    strategy: AIAgentGraphStrategy<Input, Output>,
     model: LLModel,
     tools: ToolRegistry = ToolRegistry.EMPTY,
     clock: Clock = Clock.System,
@@ -90,13 +91,20 @@ class StreamingAIAgent<Input, Output>(
     inputType: KType,
     outputType: KType,
     promptExecutor: PromptExecutor,
-    strategy: AIAgentStrategy<Input, Output>,
-    agentConfig: AIAgentConfigBase,
+    strategy: AIAgentGraphStrategy<Input, Output>,
+    override val agentConfig: AIAgentConfig,
     override val id: String = Uuid.random().toString(),
     toolRegistry: ToolRegistry = ToolRegistry.EMPTY,
     clock: Clock = Clock.System,
     installFeatures: FeatureContext.() -> Unit = {},
-) : AIAgentBase<Input, Flow<StreamingAIAgent.Event<Input, Output>>> {
+) : AIAgent<Input, Flow<StreamingAIAgent.Event<Input, Output>>> {
+
+    override suspend fun getState(): AIAgent.Companion.State<Flow<Event<Input, Output>>> =
+        AIAgent.Companion.State.NotStarted()
+
+    override suspend fun close() {
+        agent.close()
+    }
 
     sealed interface Event<out Input, out Output> {
         val runId: String
@@ -108,9 +116,7 @@ class StreamingAIAgent<Input, Output>(
         data class OnBeforeAgentStarted<Input, Output>(
             val agent: AIAgent<Input, Output>,
             override val runId: String,
-            val strategy: AIAgentStrategy<Input, Output>,
-            val feature: EventHandler,
-            val context: AIAgentContextBase
+            val context: AIAgentContext
         ) : Agent<Input, Output> {
             override val agentId: String
                 get() = agent.id
@@ -120,7 +126,6 @@ class StreamingAIAgent<Input, Output>(
             override val agentId: String,
             override val runId: String,
             val result: Output,
-            val resultType: KType,
         ) : Agent<Nothing, Output>
 
         data class OnAgentRunError(
@@ -129,33 +134,28 @@ class StreamingAIAgent<Input, Output>(
             val throwable: Throwable
         ) : Agent<Nothing, Nothing>
 
-        sealed interface Strategy<Input, Output> : Event<Input, Output> {
-            val strategy: AIAgentStrategy<Input, Output>
-            val feature: EventHandler
-        }
+        sealed interface Strategy<Input, Output> : Event<Input, Output>
 
         data class OnStrategyStarted<Input, Output>(
             override val runId: String,
-            override val strategy: AIAgentStrategy<Input, Output>,
-            override val feature: EventHandler
+            val strategyName: String,
         ) : Strategy<Input, Output>
 
         data class OnStrategyFinished<Input, Output>(
             override val runId: String,
-            override val strategy: AIAgentStrategy<Input, Output>,
-            override val feature: EventHandler,
+            val strategyName: String,
             val result: Output,
             val resultType: KType,
         ) : Strategy<Input, Output>
 
         sealed interface Node : Event<Nothing, Nothing> {
             val node: AIAgentNodeBase<*, *>
-            val context: AIAgentContextBase
+            val context: AIAgentGraphContextBase
         }
 
         data class OnBeforeNode(
             override val node: AIAgentNodeBase<*, *>,
-            override val context: AIAgentContextBase,
+            override val context: AIAgentGraphContextBase,
             val input: Any?,
             val inputType: KType,
         ) : Node {
@@ -165,7 +165,7 @@ class StreamingAIAgent<Input, Output>(
 
         data class OnAfterNode(
             override val node: AIAgentNodeBase<*, *>,
-            override val context: AIAgentContextBase,
+            override val context: AIAgentGraphContextBase,
             val input: Any?,
             val output: Any?,
             val inputType: KType,
@@ -177,7 +177,7 @@ class StreamingAIAgent<Input, Output>(
 
         data class OnNodeExecutionError(
             override val node: AIAgentNodeBase<*, *>,
-            override val context: AIAgentContextBase,
+            override val context: AIAgentGraphContextBase,
             val throwable: Throwable
         ) : Node {
             override val runId: String
@@ -208,39 +208,39 @@ class StreamingAIAgent<Input, Output>(
 
         sealed interface Tool : Event<Nothing, Nothing> {
             val toolCallId: String?
-            val toolArgs: ToolArgs
-            val tool: ai.koog.agents.core.tools.Tool<*, *>
+            val toolName: String
+            val toolArgs: JsonObject
         }
 
         data class OnToolCall(
             override val runId: String,
             override val toolCallId: String?,
-            override val tool: ai.koog.agents.core.tools.Tool<*, *>,
-            override val toolArgs: ToolArgs
+            override val toolName: String,
+            override val toolArgs: JsonObject
         ) : Tool
 
         data class OnToolValidationError(
             override val runId: String,
             override val toolCallId: String?,
-            override val tool: ai.koog.agents.core.tools.Tool<*, *>,
-            override val toolArgs: ToolArgs,
-            val error: String
+            override val toolName: String,
+            override val toolArgs: JsonObject,
+            val error: AIAgentError
         ) : Tool
 
         data class OnToolCallFailure(
             override val runId: String,
             override val toolCallId: String?,
-            override val tool: ai.koog.agents.core.tools.Tool<*, *>,
-            override val toolArgs: ToolArgs,
-            val throwable: Throwable
+            override val toolName: String,
+            override val toolArgs: JsonObject,
+            val error: AIAgentError?
         ) : Tool
 
         data class OnToolCallResult(
             override val runId: String,
             override val toolCallId: String?,
-            override val tool: ai.koog.agents.core.tools.Tool<*, *>,
-            override val toolArgs: ToolArgs,
-            val result: ToolResult?
+            override val toolName: String,
+            override val toolArgs: JsonObject,
+            val result: JsonElement?
         ) : Tool
     }
 
@@ -252,65 +252,60 @@ class StreamingAIAgent<Input, Output>(
         requireNotNull(channel) { "Race condition detected: SSEAgent2 is not running anymore" }
             .send(agent)
 
-    private val agent = AIAgent(
+    private val agent = GraphAIAgent(
         inputType = inputType,
         outputType = outputType,
         promptExecutor = promptExecutor,
-        strategy = strategy,
         agentConfig = agentConfig,
-        id = id,
+        strategy = strategy,
         toolRegistry = toolRegistry,
+        id = id,
         clock = clock.toDeprecatedClock()
     ) {
         installFeatures()
         @Suppress("UNCHECKED_CAST")
         install(EventHandler) {
-            onBeforeAgentStarted { ctx ->
+            onAgentStarting { ctx ->
                 send(
                     Event.OnBeforeAgentStarted<Input, Output>(
                         ctx.agent as AIAgent<Input, Output>,
                         ctx.runId,
-                        ctx.strategy as AIAgentStrategy<Input, Output>,
-                        ctx.feature as EventHandler,
                         ctx.context
                     )
                 )
             }
-            onAgentFinished { ctx ->
+            onAgentCompleted { ctx ->
                 send(
                     Event.OnAgentFinished(
                         ctx.agentId,
                         ctx.runId,
-                        ctx.result as Output,
-                        ctx.resultType
+                        ctx.result as Output
                     )
                 )
             }
-            onAgentRunError { ctx -> send(Event.OnAgentRunError(ctx.agentId, ctx.runId, ctx.throwable)) }
+            onAgentExecutionFailed { ctx -> send(Event.OnAgentRunError(ctx.agentId, ctx.runId, ctx.throwable)) }
 
-            onStrategyStarted { ctx ->
+            onStrategyStarting { ctx ->
                 send(
                     Event.OnStrategyStarted(
-                        ctx.runId,
-                        ctx.strategy as AIAgentStrategy<Input, Output>,
-                        ctx.feature
+                        ctx.context.runId,
+                        ctx.strategy.name
                     )
                 )
             }
-            onStrategyFinished { ctx ->
+            onStrategyCompleted { ctx ->
                 send(
                     Event.OnStrategyFinished(
-                        ctx.runId,
-                        ctx.strategy as AIAgentStrategy<Input, Output>,
-                        ctx.feature,
+                        ctx.context.runId,
+                        ctx.strategy.name,
                         ctx.result as Output,
                         ctx.resultType
                     )
                 )
             }
 
-            onBeforeNode { ctx -> send(Event.OnBeforeNode(ctx.node, ctx.context, ctx.input, ctx.inputType)) }
-            onAfterNode { ctx ->
+            onNodeExecutionStarting { ctx -> send(Event.OnBeforeNode(ctx.node, ctx.context, ctx.input, ctx.inputType)) }
+            onNodeExecutionCompleted { ctx ->
                 send(
                     Event.OnAfterNode(
                         ctx.node,
@@ -322,10 +317,10 @@ class StreamingAIAgent<Input, Output>(
                     )
                 )
             }
-            onNodeExecutionError { ctx -> send(Event.OnNodeExecutionError(ctx.node, ctx.context, ctx.throwable)) }
+            onNodeExecutionFailed { ctx -> send(Event.OnNodeExecutionError(ctx.node, ctx.context, ctx.throwable)) }
 
-            onBeforeLLMCall { ctx -> send(Event.OnBeforeLLMCall(ctx.runId, ctx.prompt, ctx.model, ctx.tools)) }
-            onAfterLLMCall { ctx ->
+            onLLMCallStarting { ctx -> send(Event.OnBeforeLLMCall(ctx.runId, ctx.prompt, ctx.model, ctx.tools)) }
+            onLLMCallCompleted { ctx ->
                 send(
                     Event.OnAfterLLMCall(
                         ctx.runId,
@@ -338,37 +333,37 @@ class StreamingAIAgent<Input, Output>(
                 )
             }
 
-            onToolCall { ctx -> send(Event.OnToolCall(ctx.runId, ctx.toolCallId, ctx.tool, ctx.toolArgs)) }
-            onToolValidationError { ctx ->
+            onToolCallStarting { ctx -> send(Event.OnToolCall(ctx.runId, ctx.toolCallId, ctx.toolName, ctx.toolArgs)) }
+            onToolValidationFailed { ctx ->
                 send(
                     Event.OnToolValidationError(
                         ctx.runId,
                         ctx.toolCallId,
-                        ctx.tool,
+                        ctx.toolName,
                         ctx.toolArgs,
                         ctx.error
                     )
                 )
             }
-            onToolCallFailure { ctx ->
+            onToolCallFailed { ctx ->
                 send(
                     Event.OnToolCallFailure(
                         ctx.runId,
                         ctx.toolCallId,
-                        ctx.tool,
+                        ctx.toolName,
                         ctx.toolArgs,
-                        ctx.throwable
+                        ctx.error
                     )
                 )
             }
-            onToolCallResult { ctx ->
+            onToolCallCompleted { ctx ->
                 send(
                     Event.OnToolCallResult(
                         ctx.runId,
                         ctx.toolCallId,
-                        ctx.tool,
+                        ctx.toolName,
                         ctx.toolArgs,
-                        ctx.result
+                        ctx.toolResult
                     )
                 )
             }

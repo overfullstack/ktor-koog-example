@@ -1,9 +1,7 @@
 package org.jetbrains.demo.agent.chat.strategy
 
 import ai.koog.agents.core.tools.annotations.LLMDescription
-import ai.koog.agents.ext.agent.SubgraphResult
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.jetbrains.demo.InternetResource
 import org.jetbrains.demo.PointOfInterest
 
@@ -14,10 +12,7 @@ data class ResearchedPointOfInterest(
     val links: List<InternetResource>,
     @property:LLMDescription("Links to images. Links must be the images themselves, not just links to them.")
     val imageLinks: List<InternetResource>
-) : SubgraphResult {
-    override fun toStringDefault(): String =
-        Json.encodeToString(serializer(), this)
-
+) {
     fun toDomain() =
         org.jetbrains.demo.ResearchedPointOfInterest(pointOfInterest, research, links, imageLinks)
 }

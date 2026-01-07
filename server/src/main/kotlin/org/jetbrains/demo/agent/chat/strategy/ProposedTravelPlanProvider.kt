@@ -1,9 +1,7 @@
 package org.jetbrains.demo.agent.chat.strategy
 
 import ai.koog.agents.core.tools.annotations.LLMDescription
-import ai.koog.agents.ext.agent.SubgraphResult
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.jetbrains.demo.Day
 import org.jetbrains.demo.InternetResource
 
@@ -21,10 +19,7 @@ data class ProposedTravelPlan(
     val pageLinks: List<InternetResource>,
     @param:LLMDescription("List of country names that the travelers will visit")
     val countriesVisited: List<String>,
-) : SubgraphResult {
-    override fun toStringDefault(): String =
-        Json.encodeToString(serializer(), this)
-
+) {
     fun toDomain() =
         org.jetbrains.demo.ProposedTravelPlan(title, plan, days, imageLinks, pageLinks, countriesVisited)
 }

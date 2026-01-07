@@ -1,6 +1,6 @@
 package org.jetbrains.demo.agent.koog
 
-import ai.koog.agents.core.agent.context.AIAgentContextBase
+import ai.koog.agents.core.agent.context.AIAgentGraphContextBase
 import ai.koog.agents.core.agent.context.getAgentContextData
 import ai.koog.agents.core.agent.entity.AIAgentNodeBase
 import ai.koog.agents.core.annotation.InternalAgentsApi
@@ -28,14 +28,15 @@ fun <IncomingInput, Wrapped, Value, OutgoingOutput> parallel(
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     name: String? = null,
 ): AIAgentNodeDelegate<IncomingInput, List<OutgoingOutput>> =
-    AIAgentParallelNodeBuilder(
+    createParallelNodeDelegate(
         transform,
         input,
         node,
         inputType,
         outputType,
-        dispatcher
-    ).let { AIAgentNodeDelegate(name, it) }
+        dispatcher,
+        name
+    )
 
 inline fun <reified IncomingInput, Wrapped, Value, reified OutgoingOutput> parallel(
     input: AIAgentNodeBase<IncomingInput, Wrapped>,
@@ -49,24 +50,26 @@ inline fun <reified IncomingInput, Wrapped, Value, reified OutgoingOutput> paral
         input,
         node,
         typeOf<IncomingInput>(),
-        typeOf<OutgoingOutput>(),
+        typeOf<List<OutgoingOutput>>(),
         dispatcher,
         name
     )
 
 @OptIn(InternalAgentsApi::class)
-private class AIAgentParallelNodeBuilder<IncomingInput, Wrapped, Value, OutgoingOutput>(
+private fun <IncomingInput, Wrapped, Value, OutgoingOutput> createParallelNodeDelegate(
     transform: suspend (Wrapped) -> List<Value>,
-    val inputNode: AIAgentNodeBase<IncomingInput, Wrapped>,
-    val node: AIAgentNodeBase<Value, OutgoingOutput>,
+    inputNode: AIAgentNodeBase<IncomingInput, Wrapped>,
+    node: AIAgentNodeBase<Value, OutgoingOutput>,
     inputType: KType,
     outputType: KType,
-    private val dispatcher: CoroutineDispatcher
-) : AIAgentNodeBuilder<IncomingInput, List<OutgoingOutput>>(
+    dispatcher: CoroutineDispatcher,
+    name: String?
+): AIAgentNodeDelegate<IncomingInput, List<OutgoingOutput>> = AIAgentNodeDelegate(
+    name = name,
     inputType = inputType,
     outputType = outputType,
     execute = { input: IncomingInput ->
-        val initialContext: AIAgentContextBase = this
+        val initialContext: AIAgentGraphContextBase = this
         val nodeContext = initialContext.fork()
         
         // Execute input node with OTel error protection

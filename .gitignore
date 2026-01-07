@@ -20,3 +20,5 @@ captures
 **/kotlin-js-store/**
 .env
 .env
+/koog-develop/
+/koog-docs/

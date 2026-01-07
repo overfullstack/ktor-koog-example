@@ -7,7 +7,6 @@ import ai.koog.agents.core.dsl.extension.HistoryCompressionStrategy
 import ai.koog.agents.core.dsl.extension.nodeLLMCompressHistory
 import ai.koog.agents.ext.agent.subgraphWithTask
 import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
-import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.markdown.markdown
 import org.jetbrains.demo.JourneyForm
 import org.jetbrains.demo.LLM_MODEL
@@ -20,7 +19,7 @@ private val IMAGE_WIDTH = 400
 private val WORD_COUNT = 200
 
 fun planner(tools: Tools) = strategy<JourneyForm, ProposedTravelPlan>("travel-planner") {
-    val pointsOfInterest by subgraphWithTask<JourneyForm, ItineraryIdeas>(
+    val pointsOfInterest by subgraphWithTask<JourneyForm, ItineraryIdeas, ItineraryIdeas>(
         toolSelectionStrategy = tools.mapsAndWeather(),
         llmModel = LLM_MODEL,
         finishTool = ItineraryIdeasProvider
@@ -43,7 +42,7 @@ fun planner(tools: Tools) = strategy<JourneyForm, ProposedTravelPlan>("travel-pl
 
     val compress by nodeLLMCompressHistory<ItineraryIdeas>(strategy = HistoryCompressionStrategy.WholeHistory)
 
-    val researchPointOfInterest by subgraphWithTask<PointOfInterest, ResearchedPointOfInterest>(
+    val researchPointOfInterest by subgraphWithTask<PointOfInterest, ResearchedPointOfInterest, ResearchedPointOfInterest>(
         toolSelectionStrategy = tools.mapsAndWeb(),
         llmModel = LLM_MODEL,
         finishTool = ResearchedPointOfInterestProvider
@@ -66,7 +65,7 @@ fun planner(tools: Tools) = strategy<JourneyForm, ProposedTravelPlan>("travel-pl
     }
 
     val researchPoints by parallel(compress, researchPointOfInterest) { it.pointsOfInterest }
-    val proposePlan by subgraphWithTask<PointOfInterestFindings, ProposedTravelPlan>(
+    val proposePlan by subgraphWithTask<PointOfInterestFindings, ProposedTravelPlan, ProposedTravelPlan>(
         toolSelectionStrategy = tools.mapsAndWeather(),
         llmModel = LLM_MODEL,
         finishTool = ProposedTravelPlanProvider

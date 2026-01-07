@@ -49,7 +49,7 @@ fun main() {
     }.start(wait = true)
 }
 
-suspend fun Application.app(config: AppConfig) {
+fun Application.app(config: AppConfig) {
     val database = database(config.database)
     val userRepository: UserRepository = ExposedUserRepository(database)
     install(Koog) {

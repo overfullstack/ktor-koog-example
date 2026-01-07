@@ -1,7 +1,6 @@
 package org.jetbrains.demo.agent.chat
 
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.ext.agent.ProvideSubgraphResult
 import ai.koog.agents.features.opentelemetry.feature.OpenTelemetry
 import ai.koog.agents.features.opentelemetry.integration.langfuse.addLangfuseExporter
 import ai.koog.prompt.dsl.prompt
@@ -44,7 +43,7 @@ private const val ANSI_CYAN = "\u001B[36m"
 private const val ANSI_GREEN = "\u001B[32m"
 private const val ANSI_RESET = "\u001B[0m"
 
-public fun Route.sse(
+fun Route.sse(
     path: String,
     method: HttpMethod = HttpMethod.Get,
     handler: suspend ServerSSESession.() -> Unit
@@ -121,7 +120,7 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
 
     return when (this) {
         is Agent -> when (this) {
-            is OnAgentFinished -> AgentEvent.AgentFinished(
+            is OnAgentFinished -> AgentFinished(
                 agentId = agentId,
                 runId = runId,
                 result.toDomain()
@@ -134,23 +133,26 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
         }
 
 
-        is StreamingAIAgent.Event.Tool if tool is ProvideSubgraphResult -> when (this) {
-            is OnToolCallResult if toolArgs is ItineraryIdeas -> Step1(toolArgs.pointsOfInterest)
-            is OnToolCallResult if toolArgs is ResearchedPointOfInterest -> Step2(toolArgs.toDomain())
-            else -> null
-        }
+        is StreamingAIAgent.Event.Tool -> when (this) {
+            is OnToolCallResult if toolName == ItineraryIdeasProvider.name ->
+                Step1(Json.decodeFromJsonElement(ItineraryIdeas.serializer(), toolArgs).pointsOfInterest)
 
-        is StreamingAIAgent.Event.Tool -> Tool(
-            id = toolCallId!!,
-            name = tool.name,
-            type = Tool.Type.fromToolName(tool.name),
-            state = when (this) {
-                is StreamingAIAgent.Event.OnToolCall -> Tool.State.Running
-                is StreamingAIAgent.Event.OnToolCallResult -> Tool.State.Succeeded
-                is StreamingAIAgent.Event.OnToolCallFailure,
-                is StreamingAIAgent.Event.OnToolValidationError -> Tool.State.Failed
-            }
-        )
+            is OnToolCallResult if toolName == ResearchedPointOfInterestProvider.name ->
+                Step2(Json.decodeFromJsonElement(ResearchedPointOfInterest.serializer(), toolArgs).toDomain())
+
+            is OnToolCallResult if toolName == ProposedTravelPlanProvider.name -> null
+            else -> Tool(
+                id = toolCallId!!,
+                name = toolName,
+                type = Tool.Type.fromToolName(toolName),
+                state = when (this) {
+                    is OnToolCall -> Tool.State.Running
+                    is OnToolCallResult -> Tool.State.Succeeded
+                    is OnToolCallFailure,
+                    is OnToolValidationError -> Tool.State.Failed
+                }
+            )
+        }
 
         is OnBeforeLLMCall -> {
             logger.info("$ANSI_CYAN=== LLM INPUT (Prompt) ===$ANSI_RESET")
@@ -163,7 +165,7 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
             null
         }
 
-        is StreamingAIAgent.Event.OnAfterLLMCall -> {
+        is OnAfterLLMCall -> {
             val input = responses.sumOf { it.metaInfo.inputTokensCount ?: 0 }
             val output = responses.sumOf { it.metaInfo.outputTokensCount ?: 0 }
             val total = responses.sumOf { it.metaInfo.totalTokensCount ?: 0 }
@@ -173,15 +175,18 @@ private fun StreamingAIAgent.Event<JourneyForm, ProposedTravelPlan>.toDomainEven
             totalTokens.updateAndFetch { it + total }
 
             logger.info("$ANSI_GREEN=== LLM OUTPUT (Response) ===$ANSI_RESET")
+            responses.filterIsInstance<Message.Tool.Call>().forEach { toolCall ->
+                logger.info("${ANSI_GREEN}Tool called: ${toolCall.tool} (id: ${toolCall.id})$ANSI_RESET")
+                logger.info("${ANSI_GREEN}Tool args: ${toolCall.content}$ANSI_RESET")
+            }
             responses.filterIsInstance<Message.Assistant>().forEach { message ->
                 logger.info("${ANSI_GREEN}Content: ${message.content}$ANSI_RESET")
             }
             logger.info("${ANSI_GREEN}Input tokens: ${inputTokens.load()}, output tokens: ${outputTokens.load()}, total tokens: ${totalTokens.load()}$ANSI_RESET")
             logger.info("${ANSI_GREEN}========================$ANSI_RESET")
-            
-            val responses = responses.filterIsInstance<Message.Assistant>().map { it.content }
-            if (responses.isNotEmpty()) AgentEvent.Message(
-                responses.filterIsInstance<Message.Assistant>().map { it.content })
+
+            val assistantContents = responses.filterIsInstance<Message.Assistant>().map { it.content }
+            if (assistantContents.isNotEmpty()) Message(assistantContents)
             else null
         }
 
