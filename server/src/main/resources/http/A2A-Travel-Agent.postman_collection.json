@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "a2a-travel-agent-collection",
-    "name": "A2A Travel Agent - Conversational",
-    "description": "Multi-turn conversational travel planning agent using A2A mesh architecture",
+    "name": "A2A Travel Agent - Chat UI",
+    "description": "Chat-like UI experience for travel planning (similar to Claude) using A2A mesh architecture",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,6 +13,11 @@
     },
     {
       "key": "conversationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "chatSessionId",
       "value": "",
       "type": "string"
     }
@@ -310,6 +315,104 @@
               "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}/message",
               "host": ["{{baseUrl}}"],
               "path": ["a2a", "conversation", "{{conversationId}}", "message"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat UI (Claude-like)",
+      "item": [
+        {
+          "name": "1. Create Chat Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.sessionId) {",
+                  "    pm.collectionVariables.set('chatSessionId', jsonData.sessionId);",
+                  "    console.log('Chat Session ID saved: ' + jsonData.sessionId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/chat/session",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "session"]
+            }
+          }
+        },
+        {
+          "name": "2. Send First Message (with journey)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{chatSessionId}}\",\n  \"message\": \"I want to plan a trip\",\n  \"journeyForm\": {\n    \"fromCity\": \"Brussels\",\n    \"toCity\": \"Amsterdam\",\n    \"startDate\": \"2025-03-15T09:00:00\",\n    \"endDate\": \"2025-03-20T18:00:00\",\n    \"transport\": \"Train\",\n    \"travelers\": [\n      {\"name\": \"John\", \"about\": \"loves art\"},\n      {\"name\": \"Jane\", \"about\": \"foodie\"}\n    ],\n    \"details\": \"Cultural trip\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/chat/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "message"]
+            }
+          }
+        },
+        {
+          "name": "3. Start Planning",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{chatSessionId}}\",\n  \"message\": \"Yes, start planning\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/chat/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "message"]
+            }
+          }
+        },
+        {
+          "name": "4. Get Chat History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/chat/session/{{chatSessionId}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "session", "{{chatSessionId}}", "messages"]
+            }
+          }
+        },
+        {
+          "name": "5. Get Session Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/chat/session/{{chatSessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "session", "{{chatSessionId}}"]
             }
           }
         }

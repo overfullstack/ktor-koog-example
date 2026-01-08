@@ -16,8 +16,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jetbrains.demo.agent.a2a.A2AAgentEndpoints
 import org.jetbrains.demo.agent.a2a.A2AConfig
+import org.jetbrains.demo.agent.a2a.ChatService
 import org.jetbrains.demo.agent.a2a.TravelOrchestratorAgent
 import org.jetbrains.demo.agent.a2a.a2aTravelAgentRoutes
+import org.jetbrains.demo.agent.a2a.chatRoutes
 import org.jetbrains.demo.agent.chat.agent
 import org.jetbrains.demo.user.ExposedUserRepository
 import org.jetbrains.demo.user.UserRepository
@@ -102,7 +104,12 @@ private fun Application.a2aMesh(config: AppConfig) {
     )
     a2aTravelAgentRoutes(orchestrator)
     
+    // Chat UI endpoints (Claude-like experience)
+    val chatService = ChatService(orchestrator)
+    chatRoutes(chatService)
+    
     log.info("A2A Mesh mode enabled. Use /a2a/plan endpoint for A2A-based travel planning.")
+    log.info("Chat UI endpoints available at /chat/* (SSE: /chat/stream, WebSocket: /chat/ws)")
 }
 
 private fun Application.configure(config: AppConfig) {
