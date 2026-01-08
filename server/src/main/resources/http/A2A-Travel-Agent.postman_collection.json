@@ -1,0 +1,345 @@
+{
+  "info": {
+    "_postman_id": "a2a-travel-agent-collection",
+    "name": "A2A Travel Agent - Conversational",
+    "description": "Multi-turn conversational travel planning agent using A2A mesh architecture",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "conversationId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/a2a/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Conversational Flow",
+      "item": [
+        {
+          "name": "1. Start Conversation (with journey)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.conversationId) {",
+                  "    pm.collectionVariables.set('conversationId', jsonData.conversationId);",
+                  "    console.log('Conversation ID saved: ' + jsonData.conversationId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"I want to plan a trip from Brussels to Amsterdam\",\n  \"journeyForm\": {\n    \"fromCity\": \"Brussels\",\n    \"toCity\": \"Amsterdam\",\n    \"startDate\": \"2025-03-15T09:00:00\",\n    \"endDate\": \"2025-03-20T18:00:00\",\n    \"transport\": \"Train\",\n    \"travelers\": [\n      {\"name\": \"John\", \"about\": \"loves art and history\"},\n      {\"name\": \"Jane\", \"about\": \"foodie, likes local cuisine\"}\n    ],\n    \"details\": null\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "start"]
+            }
+          }
+        },
+        {
+          "name": "2. Answer Preference Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Cultural & Historical, Food & Wine\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "{{conversationId}}", "message"]
+            }
+          }
+        },
+        {
+          "name": "3. Confirm Planning",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Yes, start planning\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "{{conversationId}}", "message"]
+            }
+          }
+        },
+        {
+          "name": "4. Get Conversation Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "{{conversationId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Simple Chat Flow",
+      "item": [
+        {
+          "name": "1. Start Simple Chat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.conversationId) {",
+                  "    pm.collectionVariables.set('conversationId', jsonData.conversationId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Hello, I want to plan a trip\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "start"]
+            }
+          }
+        },
+        {
+          "name": "2. Provide Journey Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"I want to go from Paris to Rome\",\n  \"journeyForm\": {\n    \"fromCity\": \"Paris\",\n    \"toCity\": \"Rome\",\n    \"startDate\": \"2025-04-10T08:00:00\",\n    \"endDate\": \"2025-04-17T20:00:00\",\n    \"transport\": \"Train\",\n    \"travelers\": [\n      {\"name\": \"Alice\", \"about\": \"architecture enthusiast\"},\n      {\"name\": \"Bob\", \"about\": \"wine lover\"}\n    ],\n    \"details\": \"We prefer a relaxed pace with some local experiences\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "{{conversationId}}", "message"]
+            }
+          }
+        },
+        {
+          "name": "3. Confirm and Start",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Yes, please proceed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "{{conversationId}}", "message"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Modify & Retry Flow",
+      "item": [
+        {
+          "name": "1. Start with Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.conversationId) {",
+                  "    pm.collectionVariables.set('conversationId', jsonData.conversationId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Planning a family trip\",\n  \"journeyForm\": {\n    \"fromCity\": \"London\",\n    \"toCity\": \"Edinburgh\",\n    \"startDate\": \"2025-05-01T10:00:00\",\n    \"endDate\": \"2025-05-05T18:00:00\",\n    \"transport\": \"Car\",\n    \"travelers\": [\n      {\"name\": \"Dad\", \"about\": \"history buff\"},\n      {\"name\": \"Mom\", \"about\": \"nature lover\"},\n      {\"name\": \"Kids\", \"about\": \"ages 10 and 12\"}\n    ],\n    \"details\": null\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "start"]
+            }
+          }
+        },
+        {
+          "name": "2. Decline and Request Changes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"No, I want to change the dates\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "{{conversationId}}", "message"]
+            }
+          }
+        },
+        {
+          "name": "3. Provide Updated Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Updated trip details\",\n  \"journeyForm\": {\n    \"fromCity\": \"London\",\n    \"toCity\": \"Edinburgh\",\n    \"startDate\": \"2025-06-15T09:00:00\",\n    \"endDate\": \"2025-06-22T17:00:00\",\n    \"transport\": \"Train\",\n    \"travelers\": [\n      {\"name\": \"Dad\", \"about\": \"history buff\"},\n      {\"name\": \"Mom\", \"about\": \"nature lover\"},\n      {\"name\": \"Kids\", \"about\": \"ages 10 and 12, love adventures\"}\n    ],\n    \"details\": \"Looking for kid-friendly activities\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "{{conversationId}}", "message"]
+            }
+          }
+        },
+        {
+          "name": "4. Confirm After Modification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Yes, start planning now\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/conversation/{{conversationId}}/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "conversation", "{{conversationId}}", "message"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Direct Planning (Non-Conversational)",
+      "item": [
+        {
+          "name": "Direct Plan Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromCity\": \"Vienna\",\n  \"toCity\": \"Prague\",\n  \"startDate\": \"2025-07-01T08:00:00\",\n  \"endDate\": \"2025-07-05T18:00:00\",\n  \"transport\": \"Train\",\n  \"travelers\": [\n    {\"name\": \"Solo Traveler\", \"about\": \"interested in classical music and architecture\"}\n  ],\n  \"details\": \"Short cultural trip\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/plan",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "plan"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

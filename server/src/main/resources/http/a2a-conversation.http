@@ -1,0 +1,205 @@
+### A2A Conversational Travel Agent - Sample Conversation Flow
+### This file demonstrates a multi-turn conversation with the travel planning agent
+
+### Environment Variables
+@baseUrl = http://localhost:8080
+
+### ============================================
+### SCENARIO 1: Start conversation with journey details
+### ============================================
+
+### Step 1: Start a new conversation with journey details
+# @name startConversationWithDetails
+POST {{baseUrl}}/a2a/conversation/start
+Content-Type: application/json
+
+{
+  "message": "I want to plan a trip from Brussels to Amsterdam",
+  "journeyForm": {
+    "fromCity": "Brussels",
+    "toCity": "Amsterdam",
+    "startDate": "2025-03-15",
+    "endDate": "2025-03-20",
+    "transport": "any",
+    "travelers": [
+      {"name": "John", "about": "loves art and history"},
+      {"name": "Jane", "about": "foodie, likes local cuisine"}
+    ],
+    "details": null
+  }
+}
+
+### Save the conversationId from response
+@conversationId = {{startConversationWithDetails.response.body.conversationId}}
+
+### Step 2: Answer the preference question (if asked about transport)
+# @name answerTransportPreference
+POST {{baseUrl}}/a2a/conversation/{{conversationId}}/message
+Content-Type: application/json
+
+{
+  "message": "Train"
+}
+
+### Step 3: Confirm to start planning
+# @name confirmPlanning
+POST {{baseUrl}}/a2a/conversation/{{conversationId}}/message
+Content-Type: application/json
+
+{
+  "message": "Yes, start planning"
+}
+
+### Step 4: Stream the planning progress (SSE endpoint)
+### Note: This is an SSE endpoint - use curl or a proper SSE client
+### curl -N "{{baseUrl}}/a2a/conversation/{{conversationId}}/stream"
+GET {{baseUrl}}/a2a/conversation/{{conversationId}}/stream
+Accept: text/event-stream
+
+### ============================================
+### SCENARIO 2: Start conversation without details (chat-style)
+### ============================================
+
+### Step 1: Start a simple conversation
+# @name startSimpleConversation
+POST {{baseUrl}}/a2a/conversation/start
+Content-Type: application/json
+
+{
+  "message": "Hello, I want to plan a trip"
+}
+
+@conversationId2 = {{startSimpleConversation.response.body.conversationId}}
+
+### Step 2: Provide journey details in follow-up
+# @name provideJourneyDetails
+POST {{baseUrl}}/a2a/conversation/{{conversationId2}}/message
+Content-Type: application/json
+
+{
+  "message": "I want to go from Paris to Rome",
+  "journeyForm": {
+    "fromCity": "Paris",
+    "toCity": "Rome",
+    "startDate": "2025-04-10",
+    "endDate": "2025-04-17",
+    "transport": "Train",
+    "travelers": [
+      {"name": "Alice", "about": "architecture enthusiast"},
+      {"name": "Bob", "about": "wine lover"}
+    ],
+    "details": "We prefer a relaxed pace with some local experiences"
+  }
+}
+
+### Step 3: Confirm planning
+# @name confirmPlanning2
+POST {{baseUrl}}/a2a/conversation/{{conversationId2}}/message
+Content-Type: application/json
+
+{
+  "message": "Yes, please proceed"
+}
+
+### ============================================
+### SCENARIO 3: Modify details before planning
+### ============================================
+
+### Start conversation
+# @name startForModification
+POST {{baseUrl}}/a2a/conversation/start
+Content-Type: application/json
+
+{
+  "message": "Planning a family trip",
+  "journeyForm": {
+    "fromCity": "London",
+    "toCity": "Edinburgh",
+    "startDate": "2025-05-01",
+    "endDate": "2025-05-05",
+    "transport": "Car",
+    "travelers": [
+      {"name": "Dad"},
+      {"name": "Mom"},
+      {"name": "Kids"}
+    ]
+  }
+}
+
+@conversationId3 = {{startForModification.response.body.conversationId}}
+
+### Decline and modify
+# @name declineAndModify
+POST {{baseUrl}}/a2a/conversation/{{conversationId3}}/message
+Content-Type: application/json
+
+{
+  "message": "No, I want to change the dates"
+}
+
+### Provide updated details
+# @name updateDetails
+POST {{baseUrl}}/a2a/conversation/{{conversationId3}}/message
+Content-Type: application/json
+
+{
+  "message": "Updated trip details",
+  "journeyForm": {
+    "fromCity": "London",
+    "toCity": "Edinburgh",
+    "startDate": "2025-06-15",
+    "endDate": "2025-06-22",
+    "transport": "Train",
+    "travelers": [
+      {"name": "Dad", "about": "history buff"},
+      {"name": "Mom", "about": "nature lover"},
+      {"name": "Kids", "about": "ages 10 and 12, love adventures"}
+    ],
+    "details": "Looking for kid-friendly activities"
+  }
+}
+
+### Now confirm
+# @name confirmAfterModification
+POST {{baseUrl}}/a2a/conversation/{{conversationId3}}/message
+Content-Type: application/json
+
+{
+  "message": "Yes, start planning now"
+}
+
+### ============================================
+### UTILITY ENDPOINTS
+### ============================================
+
+### Get conversation status
+GET {{baseUrl}}/a2a/conversation/{{conversationId}}
+Accept: application/json
+
+### Health check
+GET {{baseUrl}}/a2a/health
+Accept: application/json
+
+### ============================================
+### DIRECT PLANNING (Non-conversational)
+### ============================================
+
+### Direct plan request (no conversation, returns immediately)
+POST {{baseUrl}}/a2a/plan
+Content-Type: application/json
+
+{
+  "fromCity": "Vienna",
+  "toCity": "Prague",
+  "startDate": "2025-07-01",
+  "endDate": "2025-07-05",
+  "transport": "Train",
+  "travelers": [
+    {"name": "Solo Traveler", "about": "interested in classical music and architecture"}
+  ],
+  "details": "Short cultural trip"
+}
+
+### Streaming plan (SSE) - use query parameter for journey form
+### Note: URL encode the JSON for the query parameter
+### curl -N "{{baseUrl}}/a2a/plan/stream?journeyForm=%7B%22fromCity%22%3A%22Vienna%22%2C%22toCity%22%3A%22Prague%22%7D"

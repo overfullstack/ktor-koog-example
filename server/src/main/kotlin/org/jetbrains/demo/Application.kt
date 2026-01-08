@@ -14,6 +14,10 @@ import io.ktor.server.websocket.pingPeriod
 import io.ktor.server.websocket.timeout
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.jetbrains.demo.agent.a2a.A2AAgentEndpoints
+import org.jetbrains.demo.agent.a2a.A2AConfig
+import org.jetbrains.demo.agent.a2a.TravelOrchestratorAgent
+import org.jetbrains.demo.agent.a2a.a2aTravelAgentRoutes
 import org.jetbrains.demo.agent.chat.agent
 import org.jetbrains.demo.user.ExposedUserRepository
 import org.jetbrains.demo.user.UserRepository
@@ -35,6 +39,8 @@ data class AppConfig(
     val weatherApiUrl: String,
     val tavilyApiKey: String,
     val database: DatabaseConfig,
+    val a2aEnabled: Boolean = false,
+    val a2aBaseUrl: String = "http://localhost",
 )
 
 @Serializable
@@ -67,8 +73,36 @@ fun Application.app(config: AppConfig) {
 
     configure(config)
     agent(config)
+    
+    // A2A Mesh mode (optional - can run alongside traditional agent)
+    if (config.a2aEnabled) {
+        a2aMesh(config)
+    }
+    
     website()
     userRoutes(userRepository)
+}
+
+private fun Application.a2aMesh(config: AppConfig) {
+    val a2aConfig = A2AConfig(
+        baseUrl = config.a2aBaseUrl,
+        routePlannerPort = 9101,
+        poiResearcherPort = 9102,
+        planComposerPort = 9103
+    )
+
+    // Create the orchestrator that connects to the A2A agent servers
+    // The A2A agent servers must be started separately (see A2AServerLauncher.kt)
+    val orchestrator = TravelOrchestratorAgent(
+        A2AAgentEndpoints(
+            routePlannerUrl = "${config.a2aBaseUrl}:${a2aConfig.routePlannerPort}/a2a/route-planner",
+            poiResearcherUrl = "${config.a2aBaseUrl}:${a2aConfig.poiResearcherPort}/a2a/poi-researcher",
+            planComposerUrl = "${config.a2aBaseUrl}:${a2aConfig.planComposerPort}/a2a/plan-composer"
+        )
+    )
+    a2aTravelAgentRoutes(orchestrator)
+    
+    log.info("A2A Mesh mode enabled. Use /a2a/plan endpoint for A2A-based travel planning.")
 }
 
 private fun Application.configure(config: AppConfig) {

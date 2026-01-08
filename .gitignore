@@ -19,3 +19,5 @@ captures
 /server/src/main/resources/web/
 **/kotlin-js-store/**
 .env
+/koog-develop/
+/koog-docs/

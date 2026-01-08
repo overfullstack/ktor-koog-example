@@ -15,7 +15,10 @@ app:
   langfuseSecretKey: "$LANGFUSE_SECRET_KEY:sk-lf-4acc102c-4e47-4694-a2e5-2e1ee6a0a4da"
 
   weatherApiUrl: "$WEATHER_API_URL:https://api.open-meteo.com/v1/forecast"
-  tavilyApiKey: "$TAVILY_API_KEY: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"
+  tavilyApiKey: "$TAVILY_API_KEY"
+
+  a2aEnabled: "$A2A_ENABLED:true"
+  a2aBaseUrl: "$A2A_BASE_URL:http://localhost"
 
   database:
     driverClassName: "$DB_DRIVER_CLASS_NAME:org.postgresql.Driver"

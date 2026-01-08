@@ -15,6 +15,8 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlin.jvm.JvmStatic
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 typealias SerializableImmutableList<T> = @Serializable(ImmutableListSerializer::class) ImmutableList<T>
 
@@ -108,9 +110,10 @@ enum class TransportType {
 /**
  * Immutable traveler model.
  */
+@OptIn(ExperimentalUuidApi::class)
 @Serializable
 data class Traveler(
-    val id: String,
+    val id: String = Uuid.random().toString(),
     val name: String,
     val about: String? = null
 )
